@@ -24,7 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -81,6 +81,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 
 data class ChatMessageUi(
     val id: String,
@@ -96,17 +98,6 @@ data class ChatMessageUi(
 
     val liveLocationEndsAt: String? = null
 )
-
-private val ReplyTemplates = listOf(
-    "Уточните марку автомобиля.",
-    "Уточните цвет автомобиля.",
-    "Уточните государственный номер.",
-    "Уточните направление движения.",
-    "Вы можете отправить фото или видео?",
-    "Уточните местоположение.",
-    "Спасибо, информация принята."
-)
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,9 +117,16 @@ fun ChatScreen(
     val grayText = Color(0xFF626776)
     val blue = Color(0xFF087CF0)
 
-    var showReplySheet by remember {
-        mutableStateOf(false)
+    var receiptIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    LaunchedEffect(chatId, messages.size) {
+        while (true) {
+            try { receiptIds = RetrofitClient.apiService.receipts(chatId, authorization)["receipts"].orEmpty().mapNotNull { it["message_id"] }.toSet() } catch (_: Exception) {}
+            delay(15_000)
+        }
     }
+    val receiptScope = rememberCoroutineScope()
+    val receiptContext = LocalContext.current
+    var confirmingReceipt by remember { mutableStateOf(false) }
 
     var showMenu by remember {
         mutableStateOf(false)
@@ -359,9 +357,34 @@ fun ChatScreen(
                 }
             }
 
+            val overdue = messages.any { message ->
+                !message.isEmployee && message.id !in receiptIds && runCatching {
+                    java.time.OffsetDateTime.parse(message.createdAt).toInstant().isBefore(java.time.Instant.now().minusSeconds(900))
+                }.getOrDefault(false)
+            }
+            if (overdue) Text("Есть сообщения без подтверждения получения более 15 минут", color = Color(0xFFB42318), modifier = Modifier.padding(horizontal = 28.dp))
             Button(
+                enabled = !confirmingReceipt,
                 onClick = {
-                    showReplySheet = true
+                    android.app.AlertDialog.Builder(receiptContext)
+                        .setTitle("Подтвердить получение")
+                        .setMessage("Сообщения останутся доступны всем уполномоченным сотрудникам до 30 суток. Заявитель получит автоматическое уведомление.")
+                        .setNegativeButton("Отмена", null)
+                        .setPositiveButton("Подтвердить") { _, _ ->
+                            confirmingReceipt = true
+                            receiptScope.launch {
+                                try {
+                                    do {
+                                        val received = RetrofitClient.apiService.acknowledgeChat(chatId, authorization)
+                                        val count = received["acknowledged"] ?: 0
+                                    } while (count == 100)
+                                    receiptIds = messages.map { it.id }.toSet()
+                                    android.widget.Toast.makeText(receiptContext, "Получение зафиксировано", android.widget.Toast.LENGTH_LONG).show()
+                                } catch (_: Exception) {
+                                    android.widget.Toast.makeText(receiptContext, "Не удалось подтвердить получение", android.widget.Toast.LENGTH_LONG).show()
+                                } finally { confirmingReceipt = false }
+                            }
+                        }.show()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -374,7 +397,7 @@ fun ChatScreen(
             ) {
 
                 Text(
-                    text = "Ответить",
+                    text = if (confirmingReceipt) "Подтверждаем…" else "Подтвердить получение",
                     fontFamily = Commissioner,
                     fontWeight = FontWeight.Medium,
                     fontSize = 17.sp,
@@ -385,84 +408,6 @@ fun ChatScreen(
             Spacer(
                 modifier = Modifier.height(18.dp)
             )
-        }
-    }
-
-
-    // ШАБЛОНЫ ОТВЕТА
-    if (showReplySheet) {
-
-        val sheetState = rememberModalBottomSheetState(
-            skipPartiallyExpanded = true
-        )
-
-        ModalBottomSheet(
-            onDismissRequest = {
-                showReplySheet = false
-            },
-            sheetState = sheetState,
-            containerColor = backgroundColor
-        ) {
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = 28.dp,
-                        end = 28.dp,
-                        bottom = 26.dp
-                    )
-            ) {
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-
-                    Text(
-                        text = "Ответить",
-                        fontFamily = Commissioner,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 23.sp,
-                        color = darkText,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    IconButton(
-                        onClick = {
-                            showReplySheet = false
-                        }
-                    ) {
-
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Закрыть"
-                        )
-                    }
-                }
-
-                ReplyTemplates.forEachIndexed { index, template ->
-
-                    ReplyTemplateCard(
-                        text = template,
-                        darkText = darkText,
-                        onClick = {
-
-                            onTemplateSend(template)
-
-                            showReplySheet = false
-                        }
-                    )
-
-                    if (index != ReplyTemplates.lastIndex) {
-                        Spacer(
-                            modifier = Modifier.height(8.dp)
-                        )
-                    }
-                }
-            }
         }
     }
 
@@ -747,7 +692,7 @@ private fun ReplyTemplateCard(
         ) {
 
             Icon(
-                imageVector = Icons.Outlined.ChatBubbleOutline,
+                imageVector = Icons.Outlined.Email,
                 contentDescription = null,
                 tint = darkText,
                 modifier = Modifier.size(23.dp)
@@ -1090,7 +1035,7 @@ private fun StaticLocationMessage(
             )
 
             Text(
-                text = "Открыть на карте",
+                text = "Показать координаты",
                 fontFamily = Commissioner,
                 fontWeight = FontWeight.Medium,
                 fontSize = 12.sp,
@@ -1098,21 +1043,8 @@ private fun StaticLocationMessage(
 
                 modifier = Modifier.clickable {
 
-                    val uri =
-                        Uri.parse(
-                            "geo:$latitude,$longitude" +
-                                    "?q=$latitude,$longitude"
-                        )
-
-                    val intent =
-                        Intent(
-                            Intent.ACTION_VIEW,
-                            uri
-                        )
-
-                    runCatching {
-                        context.startActivity(intent)
-                    }
+                    android.app.AlertDialog.Builder(context).setTitle("Координаты события")
+                        .setMessage("$latitude, $longitude").setPositiveButton("Закрыть", null).show()
                 }
             )
 
@@ -1223,7 +1155,7 @@ private fun LiveLocationMessage(
 
 
             Text(
-                text = "Открыть на карте",
+                text = "Показать координаты",
                 fontFamily = Commissioner,
                 fontWeight = FontWeight.Medium,
                 fontSize = 12.sp,
@@ -1240,25 +1172,8 @@ private fun LiveLocationMessage(
                             ?: return@clickable
 
 
-                    val uri =
-                        Uri.parse(
-                            "geo:$lat,$lon" +
-                                    "?q=$lat,$lon"
-                        )
-
-
-                    val intent =
-                        Intent(
-                            Intent.ACTION_VIEW,
-                            uri
-                        )
-
-
-                    runCatching {
-                        context.startActivity(
-                            intent
-                        )
-                    }
+                    android.app.AlertDialog.Builder(context).setTitle("Координаты события")
+                        .setMessage("$lat, $lon").setPositiveButton("Закрыть", null).show()
                 }
             )
 

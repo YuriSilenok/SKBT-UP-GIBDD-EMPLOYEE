@@ -48,9 +48,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.gibdd_ochevidec.ui.theme.Commissioner
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
 import java.util.UUID
 import java.util.concurrent.Executors
 import androidx.camera.core.ExperimentalGetImage
@@ -289,13 +286,6 @@ private fun CameraQrPreview(
         }
 
 
-    val scanner =
-        remember {
-            BarcodeScanning
-                .getClient()
-        }
-
-
     var alreadyScanned by remember {
         mutableStateOf(false)
     }
@@ -306,7 +296,7 @@ private fun CameraQrPreview(
         onDispose {
 
             cameraExecutor.shutdown()
-            scanner.close()
+
         }
     }
 
@@ -359,71 +349,23 @@ private fun CameraQrPreview(
                             cameraExecutor
                         ) { imageProxy ->
 
-                            val mediaImage =
-                                imageProxy.image
-
-
-                            if (
-                                mediaImage == null ||
-                                alreadyScanned
-                            ) {
-
-                                imageProxy.close()
-                                return@setAnalyzer
-                            }
-
-
-                            val image =
-                                InputImage
-                                    .fromMediaImage(
-                                        mediaImage,
-                                        imageProxy
-                                            .imageInfo
-                                            .rotationDegrees
-                                    )
-
-
-                            scanner.process(image)
-                                .addOnSuccessListener { barcodes ->
-
-                                    if (alreadyScanned) {
-                                        return@addOnSuccessListener
-                                    }
-
-                                    val qrValue =
-                                        barcodes
-                                            .firstOrNull {
-                                                it.format ==
-                                                        Barcode.FORMAT_QR_CODE
-                                            }
-                                            ?.rawValue
-                                            ?.trim()
-
-
-                                    if (
-                                        qrValue != null &&
-                                        !alreadyScanned
-                                    ) {
-
-                                        alreadyScanned = true
-
-                                        if (isValidUuid(qrValue)) {
-
-                                            onQrScanned(
-                                                qrValue
-                                            )
-
-                                        } else {
-
-                                            onInvalidQr()
-                                        }
+                            try {
+                                if (!alreadyScanned) {
+                                    val plane = imageProxy.planes[0]
+                                    val value = com.example.gibdd_ochevidec.network.QrDecoder.decodeYPlane(
+                                        plane.buffer, imageProxy.width, imageProxy.height, plane.rowStride, plane.pixelStride
+                                    ) ?: return@setAnalyzer
+                                    alreadyScanned = true
+                                    ContextCompat.getMainExecutor(androidContext).execute {
+                                        if (isValidUuid(value)) onQrScanned(value) else onInvalidQr()
                                     }
                                 }
-                                .addOnCompleteListener {
-
-                                    imageProxy.close()
-                                }
+                            } catch (_: com.google.zxing.NotFoundException) {
+                                // Keep scanning frames; no image is transmitted or saved.
+                            } catch (_: Exception) {
+                            } finally { imageProxy.close() }
                         }
+
 
 
                     try {
@@ -443,7 +385,7 @@ private fun CameraQrPreview(
                         exception: Exception
                     ) {
 
-                        exception.printStackTrace()
+
                     }
 
                 },

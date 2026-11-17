@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.Assessment
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -77,7 +77,7 @@ fun AppBottomNavigation(
 
                 Icon(
                     imageVector =
-                        Icons.Outlined.ChatBubbleOutline,
+                        Icons.Outlined.Email,
                     contentDescription = "Чаты",
                     tint = color,
                     modifier = Modifier.size(23.dp)
@@ -151,7 +151,7 @@ fun AppBottomNavigation(
 
                     Icon(
                         imageVector =
-                            Icons.Outlined.Assessment,
+                            Icons.Outlined.List,
                         contentDescription =
                             "Отчёты",
                         tint = color,

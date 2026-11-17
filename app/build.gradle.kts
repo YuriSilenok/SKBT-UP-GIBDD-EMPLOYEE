@@ -1,7 +1,8 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    id("com.google.gms.google-services")
 }
 
 android {
@@ -11,16 +12,27 @@ android {
     }
 
     defaultConfig {
+        manifestPlaceholders["appLabel"] = "@string/app_name"
+        val apiBaseUrl = providers.gradleProperty("apiBaseUrl").orElse("https://xn--e1afhclgq.xn--p1ai:4401/").get()
+        val parsed = URI(apiBaseUrl)
+        require(parsed.scheme == "https" && parsed.host != null && parsed.userInfo == null && apiBaseUrl.endsWith("/")) { "API base URL must be an HTTPS URL ending with /" }
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+
         applicationId = "com.example.gibdd_ochevidec"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = providers.gradleProperty("ciVersionCode").map { it.toInt() }.orElse(1).get()
+        versionName = providers.gradleProperty("ciVersionName").orElse("1.0").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            manifestPlaceholders["appLabel"] = "Трезвый водитель 44 — сотрудники (тест)"
+            applicationIdSuffix = ".test"
+            versionNameSuffix = "-test"
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -34,14 +46,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 }
 
 dependencies {
-    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
-    implementation("com.google.firebase:firebase-messaging")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
+    implementation("androidx.compose.material:material-icons-core")
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
@@ -66,5 +78,17 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
-    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+}
+
+// Reproducible third-party inventory for the distributed Android application.
+tasks.register("thirdPartyInventory") {
+    doLast {
+        val dependencies = configurations.getByName(providers.gradleProperty("inventoryConfiguration").orElse("releaseRuntimeClasspath").get()).incoming.resolutionResult.allComponents
+            .mapNotNull { component -> (component.id as? org.gradle.api.artifacts.component.ModuleComponentIdentifier)?.let {
+                "${it.group}:${it.module}:${it.version}"
+            } }.distinct().sorted()
+        val output = layout.buildDirectory.file("reports/licenses/dependencies.txt").get().asFile
+        output.parentFile.mkdirs()
+        output.writeText(dependencies.joinToString("\n") + "\n")
+    }
 }

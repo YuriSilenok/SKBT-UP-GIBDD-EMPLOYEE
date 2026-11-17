@@ -76,8 +76,7 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import com.example.gibdd_ochevidec.network.RealtimeClient
 import org.json.JSONObject
-import android.util.Log
-import com.google.firebase.messaging.FirebaseMessaging
+import com.example.gibdd_ochevidec.PrivacyLog as Log
 import androidx.compose.runtime.DisposableEffect
 import com.example.gibdd_ochevidec.ui.screens.notifications.NotificationStore
 import androidx.compose.runtime.collectAsState
@@ -126,6 +125,7 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
 
+        DepartmentSyncWorker.schedule(this)
         enableEdgeToEdge()
 
         createNotificationChannel()
@@ -138,30 +138,6 @@ class MainActivity : ComponentActivity() {
 
                 var firebaseToken by remember {
                     mutableStateOf<String?>(null)
-                }
-
-                LaunchedEffect(Unit) {
-
-                    FirebaseMessaging
-                        .getInstance()
-                        .token
-                        .addOnSuccessListener { token ->
-
-                            firebaseToken = token
-
-                            Log.d(
-                                "FCM",
-                                "FCM token получен"
-                            )
-                        }
-                        .addOnFailureListener { error ->
-
-                            Log.e(
-                                "FCM",
-                                "Не удалось получить FCM token",
-                                error
-                            )
-                        }
                 }
 
                 var realtimeRefreshTick by remember {
@@ -419,6 +395,7 @@ class MainActivity : ComponentActivity() {
                             RetrofitClient
                                 .apiService
                                 .registerDevice(
+                                        authorization = com.example.gibdd_ochevidec.network.EmployeeSessionStore(this@MainActivity).load()?.authorization,
 
                                     request =
                                         RegisterDeviceRequest(
@@ -512,6 +489,7 @@ class MainActivity : ComponentActivity() {
                                 RetrofitClient
                                     .apiService
                                     .registerDevice(
+                                        authorization = com.example.gibdd_ochevidec.network.EmployeeSessionStore(this@MainActivity).load()?.authorization,
 
                                         request =
                                             RegisterDeviceRequest(
@@ -652,8 +630,7 @@ class MainActivity : ComponentActivity() {
 
                                 val response =
                                     RetrofitClient
-                                        .apiService
-                                        .chats(
+                                        .allChats(
                                             activeSession.authorization
                                         )
 
@@ -801,8 +778,7 @@ class MainActivity : ComponentActivity() {
 
                                 val response =
                                     RetrofitClient
-                                        .apiService
-                                        .messages(
+                                        .allMessages(
 
                                             observerDeviceId =
                                                 selectedChatId,
@@ -2364,7 +2340,14 @@ class MainActivity : ComponentActivity() {
         }
 
 
-    }
+            addContentView(android.widget.Button(this).apply {
+            text = "ⓘ"
+            contentDescription = "Сторонние компоненты и лицензии"
+            setOnClickListener { startActivity(android.content.Intent(this@MainActivity, LicenseActivity::class.java)) }
+        }, android.widget.FrameLayout.LayoutParams((48 * resources.displayMetrics.density).toInt(), (48 * resources.displayMetrics.density).toInt(), android.view.Gravity.TOP or android.view.Gravity.END).apply {
+            topMargin = (30 * resources.displayMetrics.density).toInt()
+        })
+}
     private fun createNotificationChannel() {
 
         if (

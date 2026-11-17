@@ -28,7 +28,8 @@ data class ChatSummaryResponse(
     val lastMedia: MediaResponse?,
 
     @SerializedName("active_ban")
-    val activeBan: BanResponse?
+    val activeBan: BanResponse?,
+    @SerializedName("unread_count") val unreadCount: Int = 0
 )
 
 data class ChatListResponse(val chats: List<ChatSummaryResponse>)

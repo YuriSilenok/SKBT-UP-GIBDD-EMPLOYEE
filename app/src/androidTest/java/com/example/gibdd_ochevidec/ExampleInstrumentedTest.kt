@@ -19,6 +19,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("com.example.gibdd_ochevidec", appContext.packageName)
+        assertEquals(com.example.gibdd_ochevidec.BuildConfig.APPLICATION_ID, appContext.packageName)
     }
 }

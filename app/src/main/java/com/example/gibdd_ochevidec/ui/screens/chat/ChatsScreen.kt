@@ -21,7 +21,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -299,7 +299,7 @@ private fun ChatCard(
 
                         Icon(
                             imageVector =
-                                Icons.Default.Block,
+                                Icons.Default.Lock,
 
                             contentDescription =
                                 "Заблокирован",

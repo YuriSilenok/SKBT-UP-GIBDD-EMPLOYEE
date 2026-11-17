@@ -14,6 +14,18 @@ import retrofit2.http.DELETE
 import retrofit2.http.PUT
 
 interface ApiService {
+    @GET("api/v1/chats/{observerId}/receipts")
+    suspend fun receipts(@Path("observerId") observerId: String,
+        @Header("Authorization") authorization: String,
+        @Header("X-Client-App") clientApp: String = "employee"): Map<String, List<Map<String, String>>>
+    @POST("api/v1/chats/{observerId}/receipt")
+    suspend fun acknowledgeChat(@Path("observerId") observerId: String,
+        @Header("Authorization") authorization: String,
+        @Header("X-Client-App") clientApp: String = "employee"): Map<String, Int>
+    @POST("api/v1/messages/{messageId}/receipt")
+    suspend fun acknowledgeReceipt(@Path("messageId") messageId: String,
+        @Header("Authorization") authorization: String,
+        @Header("X-Client-App") clientApp: String = "employee"): Map<String, String>
 
     @DELETE("api/v1/employee/devices/{device_id}/role")
     suspend fun deleteEmployeeRole(
@@ -110,6 +122,7 @@ interface ApiService {
 
     @POST("api/v1/devices/register")
     suspend fun registerDevice(
+        @Header("Authorization") authorization: String? = null,
         @Header("X-Client-App") clientApp: String = "employee",
         @Body request: RegisterDeviceRequest
     ): RegisterDeviceResponse
@@ -123,7 +136,9 @@ interface ApiService {
     @GET("api/v1/chats")
     suspend fun chats(
         @Header("Authorization") authorization: String,
-        @Header("X-Client-App") clientApp: String = "employee"
+        @Header("X-Client-App") clientApp: String = "employee",
+        @Query("offset") offset: Int = 0,
+        @Query("limit") limit: Int = 200
     ): ChatListResponse
 
     @GET("api/v1/chats/{observerDeviceId}/messages")

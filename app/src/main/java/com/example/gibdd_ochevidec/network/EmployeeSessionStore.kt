@@ -11,12 +11,14 @@ class EmployeeSessionStore(context: Context) {
 
     fun save(response: RegisterDeviceResponse) {
         preferences.edit().putString("device_id", response.deviceId)
-            .putString("role", response.role).putString("access_token", response.accessToken).apply()
+            .putString("role", response.role).putString("access_token", com.example.gibdd_ochevidec.SecretStore.encrypt(response.accessToken)).apply()
     }
 
     fun load(): EmployeeSession? {
         val deviceId = preferences.getString("device_id", null) ?: return null
-        val accessToken = preferences.getString("access_token", null) ?: return null
+        val stored = preferences.getString("access_token", null) ?: return null
+        val accessToken = com.example.gibdd_ochevidec.SecretStore.decrypt(stored) ?: return null
+        if (!stored.startsWith("v1:")) preferences.edit().putString("access_token", com.example.gibdd_ochevidec.SecretStore.encrypt(accessToken)).apply()
         return EmployeeSession(deviceId, preferences.getString("role", null), accessToken)
     }
 }

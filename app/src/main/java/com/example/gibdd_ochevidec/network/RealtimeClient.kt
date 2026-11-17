@@ -2,7 +2,7 @@ package com.example.gibdd_ochevidec.network
 
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import com.example.gibdd_ochevidec.PrivacyLog as Log
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -117,7 +117,7 @@ class RealtimeClient {
         val request =
             Request.Builder()
                 .url(
-                    "wss://xn--e1afhclgq.xn--p1ai:4401/api/v1/realtime"
+                    RetrofitClient.BASE_URL.replace("https://", "wss://") + "api/v1/realtime"
                 )
                 .addHeader(
                     "Authorization",
